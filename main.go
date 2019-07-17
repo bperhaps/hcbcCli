@@ -2,24 +2,37 @@ package main
 
 import (
 	"hcbcCli/hb"
-	"time"
+	"strconv"
 )
 
 func main() {
 	api := hb.NewHb()
 	api.SetDeviceId([]byte("Admin"))
+	api.SetPort("9999")
 	api.PrintEnv()
 
-	for i := 0; i < 1; i++ {
-		api.PutData("name"+string(i), "minsung")
+	for i := 0; i < 1000; i++ {
+
+		//startTime := time.Now()
+		api.PutData("name", strconv.FormatUint(uint64(i), 10))
+		//fmt.Println("putdata ", time.Since(startTime))
 		api.SetDebug(true)
+
+		//st := time.Now()
 		api.SendData()
+		//fmt.Println("sendData Time :", time.Since(st))
+
+		//if i%100 == 0 {
+		//	d, _ := api.GetData("name")
+		//	fmt.Println(d)
+		//}
+
 		//fmt.Print("name" + string(i) + " : ")
 		//data, _ := api.GetData("name" + string(i))
 		//fmt.Println(data)
 	}
 
-	time.Sleep(time.Second * 3)
+	//time.Sleep(time.Second * 3)
 
 	//data, _ := api.GetData("name")
 	//fmt.Println(data)

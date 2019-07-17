@@ -7,7 +7,7 @@ import (
 
 // NewBroadcaster creates a new UDP multicast connection on which to broadcast
 func NewBroadcaster(port string) (*net.UDPConn, error) {
-	address := fmt.Sprintf("0.0.0.0:%s", port)
+	address := fmt.Sprintf("255.255.255.255:%s", port)
 	addr, err := net.ResolveUDPAddr("udp4", address)
 	if err != nil {
 		return nil, err

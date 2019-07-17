@@ -17,9 +17,11 @@ func SendTx(tx *strc.Transaction, port string) {
 	if err != nil {
 		log.Panic(err)
 	}
+
 	conn.Write(request)
 	conn.Close()
 }
+
 //
 //func sendData(addr string, request []byte) ([]byte, error) {
 //	conn, err := net.Dial("tcp", addr)

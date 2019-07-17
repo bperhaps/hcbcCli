@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/gob"
-	"fmt"
 	"hcbcCli/hb/strc"
 	"hcbcCli/hb/utils"
 	"log"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -16,20 +16,21 @@ import (
 )
 
 type Authenticate struct {
-	AuthHash   [2][][]byte
-	Toggle     int
-	Idx        int
-	MaxIdx     int
+	AuthHash [2][][]byte
+	Toggle   int
+	Idx      int
+	MaxIdx   int
 }
 
 const authDB = "db/authenticate.db"
 const authBucket = "authenticate"
-const authhashBucket = "authhashs"
 
 var mutex = &sync.Mutex{}
 
 func GetAuth() *Authenticate {
-	if utils.IsFileExist(authDB) { return newAuth(1000) }
+	if !utils.IsFileExist(authDB) {
+		return newAuth(1000)
+	}
 
 	var deviceByte []byte
 
@@ -54,6 +55,12 @@ func GetAuth() *Authenticate {
 }
 
 func newAuth(maxIdx int) *Authenticate {
+
+	if _, err := os.Stat("db"); err != nil {
+		if os.IsNotExist(err) {
+			os.Mkdir("db", 0600)
+		}
+	}
 
 	authhash := &Authenticate{
 		[2][][]byte{},
@@ -101,7 +108,7 @@ func (authenticate *Authenticate) GetAuthHash(deviceId []byte, sendUpdateAuthhas
 	}
 	mutex.Unlock()
 
-	fmt.Println("toggle : ", authenticate.Toggle, " idx :", authenticate.Idx)
+	//fmt.Println("toggle : ", authenticate.Toggle, " idx :", authenticate.Idx)
 
 	authenticate.Save()
 
