@@ -4,22 +4,17 @@ import (
 	"github.com/golang/protobuf/proto"
 	"hcbcCli/hb/strc"
 	"log"
+	"net"
 )
 
-func SendTx(tx *strc.Transaction, port string) {
+func SendTx(tx *strc.Transaction, conn *net.UDPConn, port string) {
 
 	request, err := proto.Marshal(tx)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	conn, err := NewBroadcaster(port)
-	if err != nil {
-		log.Panic(err)
-	}
-
 	conn.Write(request)
-	conn.Close()
 }
 
 //

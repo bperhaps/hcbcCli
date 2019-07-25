@@ -13,6 +13,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 )
@@ -23,6 +24,7 @@ type Hb struct {
 	PuttedData map[string]interface{}
 	Mutex      *sync.Mutex
 	debug      bool
+	conn	   *net.UDPConn
 }
 
 func NewHb() *Hb {
@@ -32,6 +34,7 @@ func NewHb() *Hb {
 		PuttedData: make(map[string]interface{}),
 		Mutex:      &sync.Mutex{},
 		debug:      false,
+		conn:	    nil,
 	}
 }
 
@@ -43,8 +46,16 @@ func (hb *Hb) SetDeviceId(deviceId []byte) {
 	hb.DeviceId = deviceId
 }
 
+func (hb *Hb) Close() {
+	hb.conn.Close()
+	GetAuth().Save()
+}
+
 func (hb *Hb) SetPort(port string) {
+	if hb.conn != nil { hb.conn.Close() }
 	hb.Port = port
+	conn, err := network.NewBroadcaster(port); if err != nil { panic(err) }
+	hb.conn = conn
 }
 
 func (hb *Hb) SendData() {
@@ -56,14 +67,16 @@ func (hb *Hb) SendData() {
 	if err != nil {
 		log.Panic(err)
 	}
-
+	
+	st := time.Now()
 	authhash := GetAuth().GetAuthHash(hb.DeviceId, hb.sendUpdateAuthhash)
+	fmt.Println("ah gen", time.Since(st))
 	transaction := NewTransaction(jsonData, network.DataTx, authhash)
 
 	hb.PuttedData = make(map[string]interface{})
 
 	//st := time.Now()
-	network.SendTx(transaction, hb.Port)
+	network.SendTx(transaction, hb.conn, hb.Port)
 	//fmt.Println("sendTx Time : ", time.Since(st))
 }
 
@@ -78,7 +91,7 @@ func (hb *Hb) Regist(deviceId []byte, authhash [][]byte, idx int32, perm int32) 
 		log.Panic(err)
 	}
 	tx := NewTransaction(d, network.RegistTx, GetAuth().GetAuthHash(hb.DeviceId, hb.sendUpdateAuthhash))
-	network.SendTx(tx, hb.Port)
+	network.SendTx(tx, hb.conn, hb.Port)
 }
 
 func (hb *Hb) PutData(key, value string) {
@@ -148,7 +161,7 @@ func (hb *Hb) GetDataFromOthers(deviceId, key string) (map[string]interface{}, e
 	tx := NewTransaction(mdata, network.RequestData, auth)
 
 	go wattingData(result)
-	network.SendTx(tx, hb.Port)
+	network.SendTx(tx, hb.conn, hb.Port)
 
 	r := <-result
 
@@ -207,7 +220,7 @@ func (hb *Hb) sendUpdateAuthhash(authhash []byte, idx, toggle int) {
 	transactionId := sha256.Sum256(utils.GobEncode(transaction))
 	transaction.TxId = transactionId[:]
 
-	go network.SendTx(transaction, hb.Port)
+	go network.SendTx(transaction, hb.conn, hb.Port)
 
 	hb.Mutex.Unlock()
 }

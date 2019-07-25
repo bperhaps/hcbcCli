@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"fmt"
 
 	"github.com/boltdb/bolt"
 )
@@ -26,8 +27,12 @@ const authDB = "db/authenticate.db"
 const authBucket = "authenticate"
 
 var mutex = &sync.Mutex{}
+var authenticate *Authenticate
 
 func GetAuth() *Authenticate {
+	if authenticate != nil {
+		return authenticate
+	}
 	if !utils.IsFileExist(authDB) {
 		return newAuth(1000)
 	}
@@ -49,7 +54,7 @@ func GetAuth() *Authenticate {
 		log.Panic(err)
 	}
 
-	authenticate := DeSerialize(deviceByte)
+	authenticate = DeSerialize(deviceByte)
 
 	return authenticate
 }
@@ -83,13 +88,13 @@ func (authenticate *Authenticate) GetRootHash(toggle int) []byte {
 }
 
 func (authenticate *Authenticate) GetAuthHash(deviceId []byte, sendUpdateAuthhash func(authhash []byte, idx, toggle int)) *strc.AuthHash {
-	mutex.Lock()
-
+	st := time.Now()
 	authhash := authenticate.AuthHash[authenticate.Toggle][authenticate.Idx]
 	idx := authenticate.MaxIdx - authenticate.Idx
 	toggle := authenticate.Toggle
 	authenticate.Idx--
 
+	fmt.Println("test", time.Since(st))
 	auth := &strc.AuthHash{
 		DevicdId: deviceId,
 		Toggle:   int32(toggle),
@@ -97,20 +102,18 @@ func (authenticate *Authenticate) GetAuthHash(deviceId []byte, sendUpdateAuthhas
 		Idx:      int32(idx),
 	}
 
+
 	if authenticate.Idx <= 1 {
 		authhash := authenticate.AuthHash[authenticate.Toggle][authenticate.Idx]
 		idx := authenticate.MaxIdx - authenticate.Idx
 
 		authenticate.SetAuthhash(authenticate.Toggle)
-		go sendUpdateAuthhash(authhash, idx, authenticate.Toggle)
+		sendUpdateAuthhash(authhash, idx, authenticate.Toggle)
 		authenticate.Toggle = (authenticate.Toggle + 1) % 2
 		authenticate.Idx = authenticate.MaxIdx - 1
 	}
-	mutex.Unlock()
 
 	//fmt.Println("toggle : ", authenticate.Toggle, " idx :", authenticate.Idx)
-
-	authenticate.Save()
 
 	return auth
 
