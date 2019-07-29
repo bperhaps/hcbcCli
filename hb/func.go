@@ -11,6 +11,7 @@ import (
 	"hcbcCli/hb/utils"
 	"log"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -23,8 +24,9 @@ type Hb struct {
 	Port       string
 	PuttedData map[string]interface{}
 	Mutex      *sync.Mutex
+	NodeList   []string
 	debug      bool
-	conn	   *net.UDPConn
+	conn       *net.UDPConn
 }
 
 func NewHb() *Hb {
@@ -34,7 +36,7 @@ func NewHb() *Hb {
 		PuttedData: make(map[string]interface{}),
 		Mutex:      &sync.Mutex{},
 		debug:      false,
-		conn:	    nil,
+		conn:       nil,
 	}
 }
 
@@ -52,9 +54,14 @@ func (hb *Hb) Close() {
 }
 
 func (hb *Hb) SetPort(port string) {
-	if hb.conn != nil { hb.conn.Close() }
+	if hb.conn != nil {
+		hb.conn.Close()
+	}
 	hb.Port = port
-	conn, err := network.NewBroadcaster(port); if err != nil { panic(err) }
+	conn, err := network.NewBroadcaster(port)
+	if err != nil {
+		panic(err)
+	}
 	hb.conn = conn
 }
 
@@ -67,7 +74,7 @@ func (hb *Hb) SendData() {
 	if err != nil {
 		log.Panic(err)
 	}
-	
+
 	st := time.Now()
 	authhash := GetAuth().GetAuthHash(hb.DeviceId, hb.sendUpdateAuthhash)
 	fmt.Println("ah gen", time.Since(st))
@@ -98,8 +105,8 @@ func (hb *Hb) PutData(key, value string) {
 	hb.PuttedData[key] = value
 }
 
-func wattingData(result chan map[string]interface{}) {
-	udpAddr, err := net.ResolveUDPAddr("udp", ":2831")
+func wattingData(result chan map[string]interface{}, nodeList []string, port string) {
+	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%s", port))
 	if err != nil {
 		log.Panic(err)
 	}
@@ -123,23 +130,38 @@ func wattingData(result chan map[string]interface{}) {
 		i := strings.Index(addr.String(), ":")
 		ip := addr.String()[:i]
 
-		data := make(map[string]interface{})
-		json.Unmarshal(buffer[:n], &data)
+		for _, node_addr := range nodeList {
+			if node_addr == ip {
+				for i = 1; ; i++ {
+					c, err := net.Dial("tcp", fmt.Sprintf("%s:%d", ip, port))
+					if err != nil {
+						fmt.Println("connection error Try Again", strconv.Itoa(i))
+						continue
+					}
+					conn := network.NewConn(c)
+					res, _ := conn.ReadData()
+					conn.Close()
 
-		var cnt int
-		if _, ok := dataLog[ip]; !ok {
-			for _, data := range dataLog {
-				if bytes.Compare(data, buffer[:n]) == 0 {
-					cnt++
+					var cnt int
+					if _, ok := dataLog[ip]; !ok {
+						for _, data := range dataLog {
+							if bytes.Compare(data, res) == 0 {
+								cnt++
+							}
+						}
+						dataLog[ip] = buffer[:n]
+					}
+
+					data := make(map[string]interface{})
+					json.Unmarshal(buffer[:n], &data)
+
+					if int(data["quorum"].(float64)) >= 2 && cnt == int(data["quorum"].(float64)) {
+						delete(data, "quorum")
+						result <- data
+						break
+					}
 				}
 			}
-			dataLog[ip] = buffer[:n]
-		}
-
-		if int(data["quorum"].(float64)) >= 2 && cnt == int(data["quorum"].(float64)) {
-			delete(data, "quorum")
-			result <- data
-			break
 		}
 	}
 }
@@ -160,7 +182,7 @@ func (hb *Hb) GetDataFromOthers(deviceId, key string) (map[string]interface{}, e
 	auth := GetAuth().GetAuthHash(hb.DeviceId, hb.sendUpdateAuthhash)
 	tx := NewTransaction(mdata, network.RequestData, auth)
 
-	go wattingData(result)
+	go wattingData(result, hb.NodeList, hb.Port)
 	network.SendTx(tx, hb.conn, hb.Port)
 
 	r := <-result

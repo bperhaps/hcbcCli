@@ -1,11 +1,22 @@
 package network
 
 import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
 	"github.com/golang/protobuf/proto"
 	"hcbcCli/hb/strc"
 	"log"
 	"net"
+	"sync"
 )
+
+type connection struct {
+	net.Conn
+	byteBuffer bytes.Buffer
+	once       sync.Once
+	byteChan   chan []byte
+}
 
 func SendTx(tx *strc.Transaction, conn *net.UDPConn, port string) {
 
@@ -15,6 +26,61 @@ func SendTx(tx *strc.Transaction, conn *net.UDPConn, port string) {
 	}
 
 	conn.Write(request)
+}
+
+func NewConn(conn net.Conn) *connection {
+	return &connection{
+		Conn:     conn,
+		byteChan: make(chan []byte),
+	}
+}
+
+func (conn *connection) ReadData() ([]byte, error) {
+
+	conn.once.Do(func() {
+		go func() {
+			defer func() {
+				conn.Close()
+				close(conn.byteChan)
+			}()
+
+			for {
+				data := make([]byte, 4096)
+				n, err := conn.Read(data)
+				if err != nil {
+					break
+				}
+
+				conn.byteChan <- data[:n]
+			}
+		}()
+	})
+
+	var data []byte
+	if conn.byteBuffer.Len() <= 0 {
+		var ok bool
+		data, ok = <-conn.byteChan
+		if !ok {
+			return nil, fmt.Errorf("eof")
+		}
+
+		conn.byteBuffer.Write(data)
+	}
+
+	lengthByte := conn.byteBuffer.Next(4)
+	msgLength := binary.LittleEndian.Uint32(lengthByte)
+
+	if int(msgLength) > conn.byteBuffer.Len() {
+		for int(msgLength) > conn.byteBuffer.Len() {
+			data, ok := <-conn.byteChan
+			if !ok {
+				break
+			}
+			conn.byteBuffer.Write(data)
+		}
+	}
+
+	return conn.byteBuffer.Next(int(msgLength)), nil
 }
 
 //
