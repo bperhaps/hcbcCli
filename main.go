@@ -8,33 +8,44 @@ import (
 
 func main() {
 	api := hb.NewHb()
-	api.NodeList = append(api.NodeList, "192.168.0.66")
+
+	ip := []string{
+		"192.168.241.131",
+		"192.168.241.132",
+		"192.168.241.133",
+		"192.168.241.134",
+	}
+
+	for _, v := range ip {
+		api.NodeList = append(api.NodeList, v)
+	}
 
 	api.SetDeviceId([]byte("Admin"))
 	api.SetPort("9999")
 	api.PrintEnv()
 
-	time.Sleep(time.Second * 5)
+	//time.Sleep(time.Second * 5)
 
-	for i := 0; i < 100; i++ {
-		//	startTime := time.Now()
-		//api.PutData("name", strconv.FormatUint(uint64(i), 10))
-		//fmt.Println("putdata ", time.Since(startTime))
-		//st := time.Now()
-		//api.SendData()
-		//		fmt.Println(i, "time:", time.Since(startTime))
-		//fmt.Println("sendData Time :", time.Since(st))
+	//	startTime := time.Now()
+	//api.PutData("name", "minsung")
+	//api.SendData()
+	////fmt.Println("putdata ", time.Since(startTime))
+	////st := time.Now()
 
-		//if i%100 == 0 {
-		d, _ := api.GetData("name")
-		fmt.Println(d)
-		//}
+	//		fmt.Println(i, "time:", time.Since(startTime))
+	//fmt.Println("sendData Time :", time.Since(st))
 
-		//fmt.Print("name" + string(i) + " : ")
-		//data, _ := api.GetData("name" + string(i))
-		//fmt.Println(data)
-		time.Sleep(time.Millisecond * 100)
-	}
+	//if i%100 == 0 {
+
+	d, _ := api.GetData("name")
+	fmt.Println(d)
+
+	//}
+
+	//fmt.Print("name" + string(i) + " : ")
+	//data, _ := api.GetData("name" + string(i))
+	//fmt.Println(data)
+	time.Sleep(time.Millisecond * 100)
 
 	api.Close()
 	//time.Sleep(time.Second * 3)

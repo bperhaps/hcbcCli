@@ -106,7 +106,7 @@ func (hb *Hb) PutData(key, value string) {
 }
 
 func wattingData(result chan map[string]interface{}, nodeList []string, port string) {
-	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%s", port))
+	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%s", "2831"))
 	if err != nil {
 		log.Panic(err)
 	}
@@ -133,7 +133,7 @@ func wattingData(result chan map[string]interface{}, nodeList []string, port str
 		for _, node_addr := range nodeList {
 			if node_addr == ip {
 				for i = 1; ; i++ {
-					c, err := net.Dial("tcp", fmt.Sprintf("%s:%d", ip, port))
+					c, err := net.Dial("tcp", fmt.Sprintf("%s:%s", ip, port))
 					if err != nil {
 						fmt.Println("connection error Try Again", strconv.Itoa(i))
 						continue
@@ -149,17 +149,18 @@ func wattingData(result chan map[string]interface{}, nodeList []string, port str
 								cnt++
 							}
 						}
-						dataLog[ip] = buffer[:n]
+						dataLog[ip] = res
 					}
 
 					data := make(map[string]interface{})
-					json.Unmarshal(buffer[:n], &data)
+					json.Unmarshal(res, &data)
 
 					if int(data["quorum"].(float64)) >= 2 && cnt == int(data["quorum"].(float64)) {
 						delete(data, "quorum")
 						result <- data
 						break
 					}
+					break
 				}
 			}
 		}
